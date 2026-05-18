@@ -3,6 +3,10 @@
         "phpoffice/phpspreadsheet": "^1.23"
     },
     "config": {
-        "platform-check": false
+        "platform-check": false,
+        "platform": {
+            "ext-gd": "1.0",
+            "ext-zip": "1.0"
+        }
     }
 }
