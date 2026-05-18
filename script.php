@@ -8,47 +8,49 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx as WriterXlsx;
 use PhpOffice\PhpSpreadsheet\IOFactory as Reader;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $filename = basename($_FILES['file']['name']);
-    move_uploaded_file($_FILES['file']['tmp_name'], $filename);
-
     $spreadsheet = new Spreadsheet();
 
     try {
-        $originalSheet = Reader::load($filename);
+        // Read directly from PHP's managed temp file — no extra copy on disk
+        $originalSheet = Reader::load($_FILES['file']['tmp_name']);
     } catch (Exception $r) {
         echo "<pre>";
         var_dump($r);
+        exit;
     }
 
     $originalItem = $originalSheet->getActiveSheet();
-
     $rowsCount = getRowsCount($originalItem);
 
-    $day = 1;
-    $companyIndex = 1;
-    $emptyRows = 0;
-
     try {
-        processCompany($originalItem, $spreadsheet->getActiveSheet(), $companyIndex, 1, $rowsCount);
+        processCompany($originalItem, $spreadsheet->getActiveSheet(), 1, 1, $rowsCount);
     } catch (Throwable $e) {
         var_dump($e);
+        exit;
     }
+
+    // Free the source spreadsheet from memory before building the output
+    $originalSheet->disconnectWorksheets();
+    unset($originalSheet, $originalItem);
 
     $writer = new WriterXlsx($spreadsheet);
 
     try {
-        $filename = 'file.xlsx';
-        $writer->save($filename);
+        // Write into an in-memory stream — no file ever touches disk
+        $stream = fopen('php://temp', 'wb+');
+        $writer->save($stream);
+        $size = ftell($stream);
+        rewind($stream);
 
-        if (file_exists($filename)) {
-            $file = file_get_contents($filename);
-            $size = strlen($file);
-            header("Content-Disposition: attachment; filename = $filename");
-            header("Content-Length: $size");
-            header("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            echo $file;
-        }
+        header('Content-Disposition: attachment; filename="file.xlsx"');
+        header('Content-Length: ' . $size);
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        fpassthru($stream);
+        fclose($stream);
     } catch (\PhpOffice\PhpSpreadsheet\Writer\Exception $e) {
         var_dump($e->getMessage());
+    } finally {
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet, $writer);
     }
 }
