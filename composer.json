@@ -1,6 +1,8 @@
 {
     "require": {
-        "phpoffice/phpspreadsheet": "^1.23"
+        "phpoffice/phpspreadsheet": "^1.23",
+        "ext-gd": "*",
+        "ext-zip": "*"
     },
     "config": {
         "platform-check": false
